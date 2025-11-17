@@ -1,0 +1,56 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Dependencies (root and nested workspaces)
+node_modules/
+**/node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+config.env
+server/config.env
+
+# Build outputs / caches
+build/
+dist/
+.out/
+.cache/
+.tmp/
+.parcel-cache/
+
+# Vite specific
+.vite/
+client/vite-project/dist/
+client/vite-project/.vite/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Misc
+*.pid
+*.seed
+*.tgz
+*.local
+
+# macOS
+.AppleDouble
+.LSOverride
