@@ -17,24 +17,104 @@ export const AppProvider = ({ children }) => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [socket, setSocket] = useState(null);
   const [token, setToken] = useState(getCookie("token"));
+  const [isVideoCallActive, setIsVideoCallActive] = useState(false);
+  const [videoCallData, setVideoCallData] = useState(null);
   const navigate = useNavigate();
   useEffect(() => {
     checkAuthStatus();
   }, []);
   const connectSocket = useCallback((userData) => {
-    if (socket?.connected || !userData) return;
+    if (socket?.connected || !userData) {
+      if (socket?.connected) {
+        console.log("Socket already connected, skipping connection");
+      }
+      return;
+    }
 
+    console.log("Connecting socket for user:", userData._id);
     const newSocket = io(backendUrl, {
       query: {
         userId: userData._id,
       },
     });
+    
+    newSocket.on("connect", () => {
+      console.log("Socket connected with ID:", newSocket.id);
+      console.log("Socket query userId:", userData._id);
+    });
+    
+    newSocket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+    });
+    
     newSocket.connect();
     setSocket(newSocket);
     newSocket.on("getOnlineUsers", (userIds) => {
+      console.log("Online users received:", userIds);
       setOnlineUsers(userIds);
     });
   }, [socket]);
+
+  // Set up incoming call listener whenever socket changes
+  useEffect(() => {
+    if (!socket) {
+      console.log("Socket not available for video call listener");
+      return;
+    }
+
+    console.log("Setting up video call listener on socket:", socket.id);
+    console.log("Socket connected:", socket.connected);
+    
+    const handleIncomingCall = (data) => {
+      console.log("\n=== INCOMING VIDEO CALL RECEIVED ===");
+      console.log("Call data received:", data);
+      console.log("Caller:", data.caller);
+      
+      if (data.caller) {
+        console.log("Setting video call data and activating call screen");
+        
+        // Set both states - React will batch these updates
+        console.log("Setting videoCallData to:", data.caller);
+        setVideoCallData(data.caller);
+        
+        console.log("Setting isVideoCallActive to true");
+        setIsVideoCallActive(true);
+        
+        console.log("✓ State updates queued - incoming call screen should now be visible\n");
+      } else {
+        console.error("✗ No caller data in incoming call event");
+      }
+    };
+
+    // Set up listener when socket connects
+    const setupListener = () => {
+      console.log("Socket connected, setting up video call listener");
+      socket.off("video-call-incoming", handleIncomingCall);
+      socket.on("video-call-incoming", handleIncomingCall);
+      console.log("✓ Video call listener registered");
+    };
+
+    if (socket.connected) {
+      setupListener();
+    } else {
+      socket.on("connect", setupListener);
+    }
+
+    return () => {
+      console.log("Cleaning up video call listener");
+      socket.off("video-call-incoming", handleIncomingCall);
+      socket.off("connect", setupListener);
+    };
+  }, [socket]);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log("AppContext - isVideoCallActive changed to:", isVideoCallActive);
+  }, [isVideoCallActive]);
+
+  useEffect(() => {
+    console.log("AppContext - videoCallData changed to:", videoCallData);
+  }, [videoCallData]);
 
   // Check if user is authenticated on app load
   const checkAuthStatus = useCallback(async () => {
@@ -110,6 +190,8 @@ export const AppProvider = ({ children }) => {
     socket,
     axios,
     token,
+    isVideoCallActive,
+    videoCallData,
 
     setIsLoading,
     setUser,
@@ -118,6 +200,8 @@ export const AppProvider = ({ children }) => {
     setOnlineUsers,
     setSocket,
     setToken,
+    setIsVideoCallActive,
+    setVideoCallData,
 
     // Functions
 

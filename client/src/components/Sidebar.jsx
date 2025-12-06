@@ -2,6 +2,7 @@ import assets from "../assets/assets";
 import { useState, useContext, useEffect } from "react";
 import { Search, MoreVertical, User, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import AppContext from "../context/AppContext";
 import { ChatContext } from "../context/ChatContext";
 const URL = import.meta.env.VITE_BACKEND_URL;
@@ -69,7 +70,7 @@ const Sidebar = () => {
         ...user,
         // lastMessage: messages[messages.length-1]?.messageText,
         // lastMessageTime: Date.now(),
-        unreadCount: selectedUser?unseenMessages[selectedUser._id]:0,
+        unreadCount: selectedUser ? unseenMessages[selectedUser._id] : 0,
       };
     })
     .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
@@ -101,32 +102,33 @@ const Sidebar = () => {
   //   console.log(messages[messages.length-1])
   // }
   return (
-    <div className="border-r-[0.5px] border-solid min-h-screen w-[350px] flex flex-col">
-      <div className="flex h-[100px] w-full justify-between">
-        <div className="flex mt-[35px] ml-[30px]">
-          <div>
+    <div className="w-[350px] flex flex-col border-r border-white/10 bg-white/5 backdrop-blur-sm">
+      {/* User Profile Header */}
+      <div className="flex h-[100px] w-full items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
             <img
               src={
                 user?.profilePic === ""
                   ? assets.avatar_icon
                   : user?.profilePic || assets.avatar_icon
               }
-              className={`h-[45px] w-[45px] rounded-4xl mr-[10px] z-10 `}
+              className="h-12 w-12 rounded-full object-cover ring-2 ring-emerald-500/30"
               onError={(e) => {
                 e.target.src = assets.avatar_icon;
               }}
               alt="Profile"
-            ></img>
+            />
             <div
-              className={`bg-green-600 h-[8px] w-[8px] rounded-4xl relative bottom-[7px] left-[34px] z-0 ${
+              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 ${
                 !isOnline ? "hidden" : ""
               }`}
-            ></div>
+            />
           </div>
           <div>
-            <p className="">{user?.fullName || "User"}</p>
+            <p className="font-semibold text-white">{user?.fullName || "User"}</p>
             <p
-              className={`text-gray-500 text-[10px] ${
+              className={`text-xs text-emerald-400 ${
                 !isOnline ? "hidden" : ""
               }`}
             >
@@ -135,21 +137,29 @@ const Sidebar = () => {
           </div>
         </div>
         <div
-          className="relative top-[45px] right-[30px]"
+          className="relative"
           onMouseEnter={() => setShowDropdown(true)}
           onMouseLeave={() => setShowDropdown(false)}
         >
-          <MoreVertical className="h-4 w-4 text-gray-400 cursor-pointer" />
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <MoreVertical className="h-5 w-5 text-gray-300 cursor-pointer" />
+          </motion.button>
 
           {/* Dropdown Menu */}
           {showDropdown && (
-            <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-lg shadow-lg py-2 w-32 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute right-0 top-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl py-2 w-40 z-50"
+            >
               <button
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-white/10 flex items-center gap-2 transition-colors"
                 onClick={() => {
-                  // Handle profile action
                   navigate("/profile");
-                  // console.log("Profile clicked");
                   setShowDropdown(false);
                 }}
               >
@@ -157,25 +167,27 @@ const Sidebar = () => {
                 Profile
               </button>
               <button
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-white/10 flex items-center gap-2 transition-colors"
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4" />
                 Logout
               </button>
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
-      <div className="bg-white h-[0.5px] w-full "></div>
-      {/*INPUT */}
-      <div className="relative mt-[25px] flex justify-center">
-        <div className="relative w-[90%]">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Search className="text-gray-500"></Search>
+      
+      <div className="h-px w-full bg-white/10"></div>
+      
+      {/* Search Input */}
+      <div className="relative mt-6 flex justify-center px-4">
+        <div className="relative w-full">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
           </div>
           <input
-            className="w-full pl-10 pr-3 py-2 bg-white bg-opacity-50 rounded-2xl h-[45px] border border-gray-700  text-black placeholder-gray-500 outline-0"
+            className="w-full pl-11 pr-4 py-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
             placeholder="Search conversations..."
             type="text"
             value={searchTerm}
@@ -185,67 +197,51 @@ const Sidebar = () => {
       </div>
 
       {/* CONVERSATIONS LIST */}
-      <div className="flex-1 overflow-y-auto mt-[30px] ">
+      <div className="flex-1 overflow-y-auto mt-4 px-2">
         {filteredConversations.map((conversation) => (
-          <div
+          <motion.div
             key={conversation._id}
-            className={`group flex items-center p-4 cursor-pointer border-b border-gray-100 ${
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={`group flex items-center p-3 cursor-pointer rounded-xl mb-2 transition-all ${
               selectedUser?._id === conversation._id
-                ? "bg-blue-50 border-l-4 border-l-blue-500"
-                : ""
+                ? "bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/30 shadow-lg shadow-emerald-500/10"
+                : "hover:bg-white/5 border border-transparent"
             }`}
             onClick={() => setSelectedUser(conversation)}
           >
             {/* Avatar */}
-            <div className="relative mr-3">
+            <div className="relative mr-3 flex-shrink-0">
               <img
                 src={conversation.profilePic || assets.avatar_icon}
                 alt={conversation.fullName}
-                className="h-12 w-12 rounded-full object-cover"
+                className="h-12 w-12 rounded-full object-cover ring-2 ring-white/20"
                 onError={(e) => {
                   e.target.src = assets.avatar_icon;
                 }}
               />
               {/* Online indicator */}
               {onlineUsers.includes(conversation._id) && (
-                <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-white"></div>
+                <div className="absolute bottom-0 right-0 h-3.5 w-3.5 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div>
               )}
             </div>
 
             {/* Conversation Info */}
-            <div className="flex-1 min-w-0 ">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <h3
-                  className={`text-sm font-semibold truncate ${
-                    selectedUser?._id === conversation._id
-                      ? "text-black"
-                      : "text-white"
-                  }`}
-                >
+                <h3 className="text-sm font-semibold truncate text-white">
                   {conversation.fullName}
                 </h3>
-                <span
-                  className={`text-xs ml-2 ${
-                    selectedUser?._id === conversation._id
-                      ? "text-black"
-                      : "text-white"
-                  }`}
-                >
+                <span className="text-xs ml-2 text-gray-400 flex-shrink-0">
                   {/* {formatTime(conversation.lastMessageTime)} */}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <p
-                  className={`text-sm truncate ${
-                    selectedUser?._id === conversation._id
-                      ? "text-gray-700"
-                      : "text-gray-300"
-                  }`}
-                >
-                  {conversation.lastMessage}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm truncate text-gray-300">
+                  {conversation.lastMessage || "No messages yet"}
                 </p>
                 {conversation.unreadCount > 0 && (
-                  <div className="ml-2 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  <div className="ml-2 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 shadow-lg">
                     {conversation.unreadCount}
                   </div>
                 )}
@@ -253,15 +249,15 @@ const Sidebar = () => {
             </div>
 
             {/* More options */}
-            <div className="ml-2 opacity-0 group-hover:opacity-100">
+            <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <MoreVertical className="h-4 w-4 text-gray-400" />
             </div>
-          </div>
+          </motion.div>
         ))}
 
         {filteredConversations.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-            <Search className="h-8 w-8 mb-2" />
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <Search className="h-10 w-10 mb-3 text-gray-500" />
             <p className="text-sm">No conversations found</p>
           </div>
         )}

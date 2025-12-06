@@ -46,14 +46,97 @@ io.on("connection", (socket) => {
 
     if (userId) {
         userSocketMap[userId] = socket.id;
-        // console.log(userSocketMap[userId])
+        console.log(`User ${userId} connected with socket ID: ${socket.id}`);
+        console.log(`Current userSocketMap:`, JSON.stringify(userSocketMap, null, 2));
     }
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    
+    // Video call handlers
+    socket.on("video-call-initiate", (data) => {
+        const { targetUserId, caller } = data;
+        console.log(`\n=== Video Call Initiate ===`);
+        console.log(`From user: ${userId}`);
+        console.log(`To user: ${targetUserId}`);
+        console.log(`Caller data:`, JSON.stringify(caller, null, 2));
+        console.log(`Current userSocketMap:`, JSON.stringify(userSocketMap, null, 2));
+        
+        const targetSocketId = userSocketMap[targetUserId];
+        console.log(`Target socket ID: ${targetSocketId}`);
+        
+        if (targetSocketId) {
+            console.log(`✓ Sending incoming call notification to socket ${targetSocketId}`);
+            io.to(targetSocketId).emit("video-call-incoming", {
+                caller: caller,
+            });
+            console.log(`✓ Event emitted successfully\n`);
+        } else {
+            console.log(`✗ Target user ${targetUserId} is not online or not found in userSocketMap`);
+            console.log(`Available users:`, Object.keys(userSocketMap));
+            console.log(`\n`);
+        }
+    });
+
+    socket.on("video-call-accept", (data) => {
+        const { callerId } = data;
+        const callerSocketId = userSocketMap[callerId];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit("video-call-accepted");
+        }
+    });
+
+    socket.on("video-call-reject", (data) => {
+        const { callerId } = data;
+        const callerSocketId = userSocketMap[callerId];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit("video-call-rejected");
+        }
+    });
+
+    socket.on("video-call-end", (data) => {
+        const { targetUserId } = data;
+        const targetSocketId = userSocketMap[targetUserId];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit("video-call-ended");
+        }
+    });
+
+    socket.on("video-call-offer", (data) => {
+        const { targetUserId } = data;
+        const targetSocketId = userSocketMap[targetUserId];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit("video-call-offer", {
+                offer: data.offer,
+                fromUserId: userId,
+            });
+        }
+    });
+
+    socket.on("video-call-answer", (data) => {
+        const { targetUserId } = data;
+        const targetSocketId = userSocketMap[targetUserId];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit("video-call-answer", {
+                answer: data.answer,
+            });
+        }
+    });
+
+    socket.on("video-call-ice-candidate", (data) => {
+        const { targetUserId } = data;
+        const targetSocketId = userSocketMap[targetUserId];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit("video-call-ice-candidate", {
+                candidate: data.candidate,
+            });
+        }
+    });
+
     socket.on("disconnect", () => {
-        // console.log("User disconnected",userId);
+        console.log(`User ${userId} disconnected`);
         if (userId) {
             delete userSocketMap[userId];
         }
+        console.log(`Updated userSocketMap:`, JSON.stringify(userSocketMap, null, 2));
         io.emit("getOnlineUsers", Object.keys(userSocketMap));
     })
 })
