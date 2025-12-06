@@ -210,7 +210,7 @@ export const AppProvider = ({ children }) => {
     getUser,
     isUserVerified,
     
-
+    connectSocket,
     // Utility functions
     hasToken: () => {
       const cookies = document.cookie.split(";");

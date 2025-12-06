@@ -24,6 +24,7 @@ const LoginPage = () => {
     user,
     setUser,
     setError,
+    connectSocket,
   } = useContext(AppContext);
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -39,7 +40,7 @@ const LoginPage = () => {
       if (response.data.status === "success") {
         setUser(response.data.user);
         setIsAuthenticated(true);
-        
+        connectSocket(response.data.user);
         api.success({
           message: "Success",
           description: "Logged in successfully!!",

@@ -16,10 +16,8 @@ const ChatContainer = () => {
   useEffect(() => {
     if (selectedUser) {
       const fetchData=async()=>{
-        const res=await getMessages(selectedUser._id);
-        if (res && res.data && res.data.message) {
-          setMessages(res.data.message);
-        }
+        // getMessages already handles decryption and sets messages
+        await getMessages(selectedUser._id);
       }
       fetchData();
     } else {

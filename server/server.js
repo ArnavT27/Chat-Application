@@ -130,6 +130,31 @@ io.on("connection", (socket) => {
             });
         }
     });
+    // SOCKET CHAT MESSAGE HANDLER
+    socket.on("sendMessage", (data) => {
+        const { senderId, receiverId, message } = data;
+
+        // find receiver socket
+        const receiverSocketId = userSocketMap[receiverId];
+
+        // send to receiver
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("receiveMessage", {
+                senderId,
+                receiverId,
+                message,
+                createdAt: new Date().toISOString(),
+            });
+        }
+
+        // also send to sender (to sync UI)
+        io.to(socket.id).emit("receiveMessage", {
+            senderId,
+            receiverId,
+            message,
+            createdAt: new Date().toISOString(),
+        });
+});
 
     socket.on("disconnect", () => {
         console.log(`User ${userId} disconnected`);

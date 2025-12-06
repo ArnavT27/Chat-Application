@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import AppContext from "../context/AppContext";
 import { ChatContext } from "../context/ChatContext";
+import { Socket } from "socket.io-client";
 const URL = import.meta.env.VITE_BACKEND_URL;
 
 const Sidebar = () => {
@@ -21,6 +22,7 @@ const Sidebar = () => {
     setError,
     user,
     onlineUsers,
+    socket,
   } = useContext(AppContext);
   const { getAllUsers, users, selectedUser, setSelectedUser,unseenMessages,messages } =
     useContext(ChatContext);
@@ -44,7 +46,7 @@ const Sidebar = () => {
         setUser(null);
         setIsAuthenticated(false);
         navigate("/login");
-
+        socket.disconnect();
         setShowDropdown(false);
       }
     } catch (err) {
