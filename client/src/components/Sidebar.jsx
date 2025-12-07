@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import AppContext from "../context/AppContext";
 import { ChatContext } from "../context/ChatContext";
-import { Socket } from "socket.io-client";
 const URL = import.meta.env.VITE_BACKEND_URL;
 
 const Sidebar = () => {
@@ -24,7 +23,7 @@ const Sidebar = () => {
     onlineUsers,
     socket,
   } = useContext(AppContext);
-  const { getAllUsers, users, selectedUser, setSelectedUser,unseenMessages,messages } =
+  const { getAllUsers, users, selectedUser, setSelectedUser, unseenMessages, lastMessages } =
     useContext(ChatContext);
 
   // Fetch users when component mounts
@@ -56,32 +55,30 @@ const Sidebar = () => {
       setIsLoading(false);
     }
   };
-  const formatMessageTime = (dateString) => {
-    const date = new Date(dateString);
-    console.log(date)
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
   // Create conversation data with last messages
-  // console.log(selectedUser)
   const conversations = users
-    .map((user) => {
+    .map((chatUser) => {
+      const lastMsg = lastMessages[chatUser._id];
       return {
-        ...user,
-        // lastMessage: messages[messages.length-1]?.messageText,
-        // lastMessageTime: Date.now(),
-        unreadCount: selectedUser ? unseenMessages[selectedUser._id] : 0,
+        ...chatUser,
+        lastMessage: lastMsg?.text || "No messages yet",
+        lastMessageTime: lastMsg?.time || null,
+        unreadCount: unseenMessages[chatUser._id] || 0,
       };
     })
-    .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+    .sort((a, b) => {
+      // Sort by last message time, putting conversations with messages first
+      if (!a.lastMessageTime && !b.lastMessageTime) return 0;
+      if (!a.lastMessageTime) return 1;
+      if (!b.lastMessageTime) return -1;
+      return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
+    });
 
   // Filter conversations based on search term
   const filteredConversations = conversations.filter(
     (conversation) =>
       conversation.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conversation.lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
+      (conversation.lastMessage && conversation.lastMessage.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const formatTime = (dateString) => {
@@ -234,13 +231,15 @@ const Sidebar = () => {
                 <h3 className="text-sm font-semibold truncate text-white">
                   {conversation.fullName}
                 </h3>
-                <span className="text-xs ml-2 text-gray-400 flex-shrink-0">
-                  {/* {formatTime(conversation.lastMessageTime)} */}
-                </span>
+                {conversation.lastMessageTime && (
+                  <span className="text-xs ml-2 text-gray-400 flex-shrink-0">
+                    {formatTime(conversation.lastMessageTime)}
+                  </span>
+                )}
               </div>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm truncate text-gray-300">
-                  {conversation.lastMessage || "No messages yet"}
+                  {conversation.lastMessage}
                 </p>
                 {conversation.unreadCount > 0 && (
                   <div className="ml-2 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center flex-shrink-0 shadow-lg">

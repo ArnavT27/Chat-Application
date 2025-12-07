@@ -13,6 +13,7 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [callStatus, setCallStatus] = useState(isIncoming ? "incoming" : "calling");
   const [peerConnection, setPeerConnection] = useState(null);
+  const [pendingOffer, setPendingOffer] = useState(null); // Store offer until user accepts
   
   const { socket } = useContext(AppContext);
   const { selectedUser } = useContext(ChatContext);
@@ -52,10 +53,10 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
 
     // Handle remote stream
     pc.ontrack = (event) => {
-      setRemoteStream(event.streams[0]);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
+      console.log("Received remote track:", event.track.kind);
+      const stream = event.streams[0];
+      console.log("Remote stream tracks:", stream.getTracks().map(t => t.kind));
+      setRemoteStream(stream);
     };
 
     setPeerConnection(pc);
@@ -73,10 +74,12 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
 
     const getMedia = async () => {
       try {
+        console.log("Getting user media...");
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
+        console.log("Got media stream:", stream);
         setLocalStream(stream);
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
@@ -90,19 +93,16 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
       }
     };
 
-    // Get media immediately for outgoing calls, wait for accept for incoming calls
-    if (!isIncoming) {
-      getMedia();
-    } else if (isIncoming && callStatus === "connected") {
+    // Get media immediately for both incoming and outgoing calls
+    // This ensures the receiver has their camera ready when they accept
+    if (!localStream) {
       getMedia();
     }
 
     return () => {
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
-      }
+      // Don't cleanup here, let handleEndCall do it
     };
-  }, [isOpen, peerConnection, isIncoming, callStatus]);
+  }, [isOpen, localStream]);
 
   // Add tracks to peer connection when both are ready
   useEffect(() => {
@@ -111,6 +111,7 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
     if (peerConnection && localStream && peerConnection.signalingState !== 'closed') {
       try {
         const tracks = localStream.getTracks();
+        console.log("Adding local tracks to peer connection:", tracks.map(t => t.kind));
         tracks.forEach((track) => {
           // Check if track is still live and connection is still open
           if (track.readyState === 'live' && peerConnection.signalingState !== 'closed') {
@@ -118,6 +119,7 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
               (sender) => sender.track === track
             );
             if (!existingSender) {
+              console.log(`Adding ${track.kind} track to peer connection`);
               peerConnection.addTrack(track, localStream);
             }
           }
@@ -131,17 +133,35 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
     }
   }, [peerConnection, localStream, isOpen]);
 
+  // Update remote video element when remote stream changes
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      console.log("Setting remote video srcObject");
+      remoteVideoRef.current.srcObject = remoteStream;
+      
+      // Force play in case autoplay doesn't work
+      remoteVideoRef.current.play().catch(err => {
+        console.error("Error playing remote video:", err);
+      });
+    }
+  }, [remoteStream]);
+
   // Create offer for outgoing calls after tracks are added
   useEffect(() => {
-    if (!isIncoming && callStatus === "connected" && peerConnection && localStream && socket && targetUser) {
+    // Only create offer if we're the caller (not incoming) and we have everything ready
+    if (!isIncoming && peerConnection && localStream && socket && targetUser && callStatus === "calling") {
       if (peerConnection.signalingState === 'closed') {
         return;
       }
-      const createOffer = async () => {
+      
+      // Wait a bit for tracks to be added
+      const timer = setTimeout(async () => {
         try {
-          if (peerConnection.signalingState !== 'closed') {
+          if (peerConnection.signalingState !== 'closed' && peerConnection.signalingState !== 'have-local-offer') {
+            console.log("Creating offer...");
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
+            console.log("Sending offer to receiver");
             socket.emit("video-call-offer", {
               targetUserId: targetUser._id,
               offer: offer,
@@ -150,8 +170,9 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
         } catch (error) {
           console.error("Error creating offer:", error);
         }
-      };
-      createOffer();
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
   }, [isIncoming, callStatus, peerConnection, localStream, socket, targetUser]);
 
@@ -175,26 +196,22 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
     };
 
     const handleOffer = async (data) => {
-      if (isIncoming && peerConnection && peerConnection.signalingState !== 'closed') {
-        try {
-          await peerConnection.setRemoteDescription(data.offer);
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          socket.emit("video-call-answer", {
-            targetUserId: data.fromUserId,
-            answer: answer,
-          });
-          setCallStatus("connected");
-        } catch (error) {
-          console.error("Error handling offer:", error);
-        }
+      console.log("Received offer from caller");
+      // Store the offer but don't process it until user accepts the call
+      if (isIncoming) {
+        console.log("Storing offer for incoming call - waiting for user to accept");
+        setPendingOffer(data);
       }
     };
 
     const handleAnswer = async (data) => {
-      if (!isIncoming && peerConnection && peerConnection.signalingState !== 'closed') {
+      console.log("Received answer from receiver");
+      if (peerConnection && peerConnection.signalingState !== 'closed') {
         try {
-          await peerConnection.setRemoteDescription(data.answer);
+          console.log("Setting remote description (answer)");
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+          setCallStatus("connected");
+          console.log("Connection established!");
         } catch (error) {
           console.error("Error handling answer:", error);
         }
@@ -251,10 +268,73 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
     }, 1000);
   };
 
-  const handleAcceptCall = () => {
-    if (socket && callerInfo) {
+  const handleAcceptCall = async () => {
+    console.log("Accepting call...");
+    
+    // Make sure we have local stream before accepting
+    let streamToUse = localStream;
+    if (!streamToUse) {
+      console.log("Waiting for local stream...");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        setLocalStream(stream);
+        streamToUse = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error("Error getting media:", error);
+        alert("Could not access camera/microphone");
+        return;
+      }
+    }
+    
+    if (socket && callerInfo && peerConnection) {
+      // Add tracks to peer connection first
+      if (streamToUse && peerConnection.signalingState !== 'closed') {
+        const tracks = streamToUse.getTracks();
+        console.log("Adding tracks before processing offer:", tracks.map(t => t.kind));
+        tracks.forEach((track) => {
+          if (track.readyState === 'live') {
+            const existingSender = peerConnection.getSenders().find(
+              (sender) => sender.track === track
+            );
+            if (!existingSender) {
+              console.log(`Adding ${track.kind} track to peer connection`);
+              peerConnection.addTrack(track, streamToUse);
+            }
+          }
+        });
+      }
+      
+      console.log("Emitting video-call-accept");
       socket.emit("video-call-accept", { callerId: callerInfo._id });
-      setCallStatus("connected");
+      
+      // Wait a bit for tracks to be fully added, then process the pending offer
+      setTimeout(async () => {
+        if (pendingOffer && peerConnection && peerConnection.signalingState !== 'closed') {
+          try {
+            console.log("Processing pending offer after user accepted");
+            console.log("Setting remote description (offer)");
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingOffer.offer));
+            console.log("Creating answer");
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            console.log("Sending answer back to caller");
+            socket.emit("video-call-answer", {
+              targetUserId: pendingOffer.fromUserId,
+              answer: answer,
+            });
+            setCallStatus("connected");
+            setPendingOffer(null); // Clear pending offer
+          } catch (error) {
+            console.error("Error handling offer after accept:", error);
+          }
+        }
+      }, 300);
     }
   };
 
@@ -285,15 +365,22 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
 
   // Debug props
   useEffect(() => {
-    console.log("VideoCall component props:", {
+    console.log("VideoCall component mounted/updated with props:", {
       isOpen,
       isIncoming,
       callerInfo,
       callStatus,
+      targetUser,
     });
-  }, [isOpen, isIncoming, callerInfo, callStatus]);
+  }, [isOpen, isIncoming, callerInfo, callStatus, targetUser]);
+  
+  useEffect(() => {
+    if (isOpen) {
+      console.log("🎥 VideoCall is OPEN - component should be visible!");
+    }
+  }, [isOpen]);
 
-  console.log("VideoCall: Rendering, isOpen =", isOpen);
+  console.log("VideoCall: Rendering, isOpen =", isOpen, "isIncoming =", isIncoming);
 
   return (
     <AnimatePresence mode="wait">
@@ -312,7 +399,10 @@ const VideoCall = ({ isOpen, onClose, isIncoming = false, callerInfo = null }) =
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
+                muted={false}
                 className="w-full h-full object-cover"
+                onLoadedMetadata={() => console.log("Remote video metadata loaded")}
+                onPlay={() => console.log("Remote video playing")}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

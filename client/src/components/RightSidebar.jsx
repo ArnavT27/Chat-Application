@@ -1,10 +1,8 @@
 import React, { useContext } from "react";
 import {
-  Phone,
   Video,
   MoreVertical,
   Mail,
-  MapPin,
   Calendar,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -39,13 +37,7 @@ const RightSidebar = () => {
       <div className="p-6 border-b border-white/10 bg-white/5 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-white">Contact Info</h2>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <MoreVertical className="w-5 h-5 text-gray-300" />
-          </motion.button>
+          
         </div>
 
         {/* User Profile */}
@@ -74,19 +66,7 @@ const RightSidebar = () => {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className="p-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-full hover:from-emerald-600 hover:to-green-600 transition-all shadow-lg shadow-emerald-500/30 cursor-pointer"
-            >
-              <Phone className="w-5 h-5" />
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
               onClick={() => {
-                console.log("Video button clicked");
-                console.log("Socket:", socket);
-                console.log("Socket connected:", socket?.connected);
-                console.log("Selected user:", selectedUser);
-                console.log("Current user:", user);
                 
                 if (!socket) {
                   console.error("Socket is not available");
@@ -122,13 +102,23 @@ const RightSidebar = () => {
                 setVideoCallData(null); // Not an incoming call
               }}
               className="p-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-full hover:from-emerald-600 hover:to-green-600 transition-all shadow-lg shadow-emerald-500/30 cursor-pointer"
+              title="Start video call"
             >
               <Video className="w-5 h-5" />
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                if (selectedUser?.email) {
+                  // Open default email client with pre-filled recipient
+                  window.location.href = `mailto:${selectedUser.email}?subject=Message from ${user?.fullName || 'Chat App'}&body=Hi ${selectedUser.fullName},%0D%0A%0D%0A`;
+                } else {
+                  alert("Email address not available for this user");
+                }
+              }}
               className="p-3 bg-white/10 backdrop-blur-sm text-gray-300 rounded-full hover:bg-white/20 border border-white/20 transition-all cursor-pointer"
+              title={`Send email to ${selectedUser.email || 'user'}`}
             >
               <Mail className="w-5 h-5" />
             </motion.button>
@@ -156,14 +146,6 @@ const RightSidebar = () => {
                   ? new Date(selectedUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                   : "January 2024"}
               </p>
-            </div>
-          </div>
-
-          <div className="flex items-start space-x-3 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-            <MapPin className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Location</p>
-              <p className="text-sm text-white">{selectedUser.location || "Not specified"}</p>
             </div>
           </div>
         </div>

@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
-import { Send, Paperclip, Smile, MoreVertical } from "lucide-react";
-import { motion } from "framer-motion";
+import { Send, Paperclip, Smile, MoreVertical, Shield } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import EmojiPicker from "emoji-picker-react";
 import assets from "../assets/assets";
 import { ChatContext } from "../context/ChatContext";
 import AppContext from "../context/AppContext";
 const ChatContainer = () => {
   // const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
+  const emojiPickerRef = useRef(null);
   const { selectedUser,sendMessage,getMessages,messages,setMessages } = useContext(ChatContext);
   const { onlineUsers,user } = useContext(AppContext);
   const currentUserId = user?._id;
@@ -41,16 +44,8 @@ const ChatContainer = () => {
       console.log(reader.result)
       // Auto send image message
       if (selectedUser) {
-        // const message = {
-        //   _id: Date.now().toString(),
-        //   senderId: currentUserId,
-        //   receiverId: selectedUser._id,
-        //   image: reader.result,
-        //   seen: false,
-        //   createdAt: new Date().toISOString(),
-        // };
-        await sendMessage(reader.result);
-        // setMessages([...messages, message]);
+        await sendMessage({image: reader.result});
+        // Message will be added via socket event
       }
     };
   };
@@ -60,8 +55,10 @@ const ChatContainer = () => {
     if (newMessage.trim() && selectedUser) {
       const messageText = newMessage.trim();
       setNewMessage(""); // Clear input immediately for better UX
+      
       try {
         await sendMessage({text: messageText});
+        // Message will be added via socket event - no need to add here
       } catch (error) {
         // If send fails, restore the message text
         setNewMessage(messageText);
@@ -77,6 +74,28 @@ const ChatContainer = () => {
       minute: "2-digit",
     });
   };
+
+  const handleEmojiClick = (emojiData) => {
+    setNewMessage((prev) => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   
 
@@ -133,13 +152,18 @@ const ChatContainer = () => {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+          {/* Encryption Indicator */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full"
+            title="End-to-end encrypted with AES-256 + QKD"
           >
-            <MoreVertical className="w-5 h-5 text-gray-300" />
-          </motion.button>
+            <Shield className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-medium text-emerald-400">Encrypted</span>
+          </motion.div>
+          
+          
         </div>
       </div>
 
@@ -242,10 +266,34 @@ const ChatContainer = () => {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-colors"
             >
               <Smile className="w-5 h-5 text-gray-300" />
             </motion.button>
+            
+            {/* Emoji Picker */}
+            <AnimatePresence>
+              {showEmojiPicker && (
+                <motion.div
+                  ref={emojiPickerRef}
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute bottom-full right-0 mb-2 z-50"
+                >
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    theme="dark"
+                    width={350}
+                    height={400}
+                    searchPlaceHolder="Search emoji..."
+                    previewConfig={{ showPreview: false }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}

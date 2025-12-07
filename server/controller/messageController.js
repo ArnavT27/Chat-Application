@@ -1,26 +1,52 @@
 const Message = require("../models/messageModel");
 const User = require("../models/userModel");
 const cloudinary = require('../lib/cloudinary');
-const { io, userSocketMap } = require("../server");
+const { encryptData } = require('../utils/encryption');
 
-// Add safety check for userSocketMap
-if (!userSocketMap) {
-    console.warn("userSocketMap is not available - socket messaging may not work properly");
-}
+// Import will be done dynamically to avoid circular dependency
+let io, userSocketMap;
+
+const getSocketInstances = () => {
+    if (!io || !userSocketMap) {
+        const server = require("../server");
+        io = server.io;
+        userSocketMap = server.userSocketMap;
+    }
+    return { io, userSocketMap };
+};
 exports.getUsersforSidebar = async (req, res) => {
     try {
         const id = req.user._id;
         const users = await User.find({ _id: { $ne: id } }).select('-password');
 
         const unseenMessages = {};
+        const lastMessages = {};
+
         const promises = users.map(async (user) => {
+            // Get unseen messages count
             const messages = await Message.find({ senderId: user._id, receiverId: id, seen: false });
             if (messages.length > 0) {
                 unseenMessages[user._id] = messages.length;
             }
+
+            // Get last message between current user and this user
+            const lastMessage = await Message.findOne({
+                $or: [
+                    { senderId: id, receiverId: user._id },
+                    { senderId: user._id, receiverId: id }
+                ]
+            }).sort({ createdAt: -1 });
+
+            if (lastMessage) {
+                lastMessages[user._id] = {
+                    text: lastMessage.messageText || (lastMessage.messageImage ? '📷 Image' : ''),
+                    time: lastMessage.createdAt,
+                    senderId: lastMessage.senderId
+                };
+            }
         })
         await Promise.all(promises);
-        res.json({ status: 'success', users, unseenMessages });
+        res.json({ status: 'success', users, unseenMessages, lastMessages });
     }
     catch (err) {
         res.json({
@@ -91,7 +117,7 @@ exports.sendMessage = async (req, res) => {
         }
         let imageUrl;
         if (image) {
-            // Ensure Cloudinary is properly configured before upload
+            // Upload image to Cloudinary
             cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
                 api_key: process.env.CLOUDINARY_API_KEY,
@@ -100,7 +126,11 @@ exports.sendMessage = async (req, res) => {
             });
 
             const uploadResponse = await cloudinary.uploader.upload(image);
-            imageUrl = uploadResponse.secure_url;
+            const plainImageUrl = uploadResponse.secure_url;
+
+            // Encrypt the Cloudinary URL before storing in database
+            imageUrl = encryptData(plainImageUrl, senderId.toString(), receiverId.toString());
+            console.log('🖼️ Image uploaded and URL encrypted');
         }
         const message = await Message.create({
             senderId,
@@ -110,14 +140,40 @@ exports.sendMessage = async (req, res) => {
         })
 
         //emit the new message to receiver's socket
-        const receiverSocketId = userSocketMap && userSocketMap[receiverId];
-        console.log("Receiver ID:", receiverId);
-        console.log("User Socket Map:", userSocketMap);
+        // Get socket instances dynamically to avoid circular dependency
+        const { io: socketIo, userSocketMap: socketMap } = getSocketInstances();
+
+        // Convert to strings for userSocketMap lookup
+        const receiverIdStr = String(receiverId);
+        const senderIdStr = String(senderId);
+
+        const receiverSocketId = socketMap && socketMap[receiverIdStr];
+        const senderSocketId = socketMap && socketMap[senderIdStr];
+
+        console.log("\n=== Sending Message via Socket ===");
+        console.log("Receiver ID:", receiverIdStr);
+        console.log("Sender ID:", senderIdStr);
+        console.log("User Socket Map:", JSON.stringify(socketMap, null, 2));
         console.log("Receiver Socket ID:", receiverSocketId);
+        console.log("Sender Socket ID:", senderSocketId);
+        console.log("Message ID:", message._id);
 
         if (receiverSocketId) {
-            io.to(receiverSocketId).emit("newMessage", message)
+            console.log("✓ Emitting to receiver socket:", receiverSocketId);
+            socketIo.to(receiverSocketId).emit("newMessage", message);
+        } else {
+            console.log("✗ Receiver not online or socket not found");
         }
+
+        // Also emit to sender for real-time sync across tabs/devices
+        if (senderSocketId) {
+            console.log("✓ Emitting to sender socket:", senderSocketId);
+            socketIo.to(senderSocketId).emit("newMessage", message);
+        } else {
+            console.log("✗ Sender socket not found");
+        }
+        console.log("=== End Socket Emission ===\n");
+
         res.json({ status: 'success', message });
     }
     catch (err) {

@@ -31,6 +31,15 @@ app.use(cors({ credentials: true, origin: allowedOrigin }));
 app.use('/api/messages', messageRouter);
 app.use('/api/auth', authRouter);
 
+// Debug endpoint to check socket connections
+app.get('/api/debug/sockets', (req, res) => {
+    res.json({
+        connectedUsers: Object.keys(userSocketMap),
+        userSocketMap: userSocketMap,
+        totalConnections: Object.keys(userSocketMap).length
+    });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: allowedOrigin } });
 exports.io = io;
@@ -50,7 +59,7 @@ io.on("connection", (socket) => {
         console.log(`Current userSocketMap:`, JSON.stringify(userSocketMap, null, 2));
     }
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
-    
+
     // Video call handlers
     socket.on("video-call-initiate", (data) => {
         const { targetUserId, caller } = data;
@@ -59,10 +68,13 @@ io.on("connection", (socket) => {
         console.log(`To user: ${targetUserId}`);
         console.log(`Caller data:`, JSON.stringify(caller, null, 2));
         console.log(`Current userSocketMap:`, JSON.stringify(userSocketMap, null, 2));
-        
-        const targetSocketId = userSocketMap[targetUserId];
+
+        // Convert to string for consistent lookup
+        const targetUserIdStr = String(targetUserId);
+        const targetSocketId = userSocketMap[targetUserIdStr];
+        console.log(`Target user ID (string): ${targetUserIdStr}`);
         console.log(`Target socket ID: ${targetSocketId}`);
-        
+
         if (targetSocketId) {
             console.log(`✓ Sending incoming call notification to socket ${targetSocketId}`);
             io.to(targetSocketId).emit("video-call-incoming", {
@@ -78,7 +90,7 @@ io.on("connection", (socket) => {
 
     socket.on("video-call-accept", (data) => {
         const { callerId } = data;
-        const callerSocketId = userSocketMap[callerId];
+        const callerSocketId = userSocketMap[String(callerId)];
         if (callerSocketId) {
             io.to(callerSocketId).emit("video-call-accepted");
         }
@@ -86,7 +98,7 @@ io.on("connection", (socket) => {
 
     socket.on("video-call-reject", (data) => {
         const { callerId } = data;
-        const callerSocketId = userSocketMap[callerId];
+        const callerSocketId = userSocketMap[String(callerId)];
         if (callerSocketId) {
             io.to(callerSocketId).emit("video-call-rejected");
         }
@@ -94,7 +106,7 @@ io.on("connection", (socket) => {
 
     socket.on("video-call-end", (data) => {
         const { targetUserId } = data;
-        const targetSocketId = userSocketMap[targetUserId];
+        const targetSocketId = userSocketMap[String(targetUserId)];
         if (targetSocketId) {
             io.to(targetSocketId).emit("video-call-ended");
         }
@@ -102,7 +114,7 @@ io.on("connection", (socket) => {
 
     socket.on("video-call-offer", (data) => {
         const { targetUserId } = data;
-        const targetSocketId = userSocketMap[targetUserId];
+        const targetSocketId = userSocketMap[String(targetUserId)];
         if (targetSocketId) {
             io.to(targetSocketId).emit("video-call-offer", {
                 offer: data.offer,
@@ -113,7 +125,7 @@ io.on("connection", (socket) => {
 
     socket.on("video-call-answer", (data) => {
         const { targetUserId } = data;
-        const targetSocketId = userSocketMap[targetUserId];
+        const targetSocketId = userSocketMap[String(targetUserId)];
         if (targetSocketId) {
             io.to(targetSocketId).emit("video-call-answer", {
                 answer: data.answer,
@@ -123,7 +135,7 @@ io.on("connection", (socket) => {
 
     socket.on("video-call-ice-candidate", (data) => {
         const { targetUserId } = data;
-        const targetSocketId = userSocketMap[targetUserId];
+        const targetSocketId = userSocketMap[String(targetUserId)];
         if (targetSocketId) {
             io.to(targetSocketId).emit("video-call-ice-candidate", {
                 candidate: data.candidate,
@@ -154,7 +166,7 @@ io.on("connection", (socket) => {
             message,
             createdAt: new Date().toISOString(),
         });
-});
+    });
 
     socket.on("disconnect", () => {
         console.log(`User ${userId} disconnected`);

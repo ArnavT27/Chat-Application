@@ -24,8 +24,12 @@ const HomePage = () => {
       isVideoCallActive,
       videoCallData,
       isIncoming: !!videoCallData,
+      shouldRenderVideoCall: isVideoCallActive,
     });
   }, [isVideoCallActive, videoCallData]);
+  
+  // Add debug log for render
+  console.log("HomePage rendering, isVideoCallActive:", isVideoCallActive);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-950 via-black to-gray-900 text-white">
