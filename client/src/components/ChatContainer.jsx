@@ -157,7 +157,7 @@ const ChatContainer = () => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full"
-            title="End-to-end encrypted with AES-256 + QKD"
+            title="End-to-end encrypted with AES-128"
           >
             <Shield className="w-4 h-4 text-emerald-400" />
             <span className="text-xs font-medium text-emerald-400">Encrypted</span>

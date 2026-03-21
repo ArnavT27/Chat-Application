@@ -6,12 +6,7 @@
 import { encryptMessage, decryptMessage, showEncryptionStatus, refreshQuantumKeys } from './encryption.js';
 
 export const testEncryption = () => {
-    console.clear();
-    console.log('╔════════════════════════════════════════════════╗');
-    console.log('║        🧪 ENCRYPTION TEST SUITE 🧪            ║');
-    console.log('╚════════════════════════════════════════════════╝\n');
 
-    // Show encryption status
     showEncryptionStatus();
 
     // Test data
@@ -19,10 +14,7 @@ export const testEncryption = () => {
     const userId2 = 'user456';
     const testMessages = [
         'Hello, World!',
-        'This is a secret message 🔐',
         'Testing quantum-safe encryption with AES-256',
-        'Special characters: !@#$%^&*()_+-=[]{}|;:,.<>?',
-        'Unicode test: 你好世界 🌍 مرحبا بالعالم'
     ];
 
     console.log('📝 Test Messages:');

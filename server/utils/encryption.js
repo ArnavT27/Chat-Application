@@ -1,24 +1,22 @@
 const CryptoJS = require('crypto-js');
 
 /**
- * Derives a shared encryption key using QKD simulation
- * @param {string} userId1 - First user ID
- * @param {string} userId2 - Second user ID
- * @returns {string} - Quantum-derived encryption key
+ * Derive a shared encryption key from two user IDs
+ * Uses simple deterministic key generation for AES-128
  */
 const deriveSharedKey = (userId1, userId2) => {
+    // Sort IDs to ensure same key regardless of order
     const sortedIds = [userId1, userId2].sort().join('-');
-    const seed = CryptoJS.SHA256(sortedIds + 'qkd-seed-2024').toString();
-    const finalKey = CryptoJS.SHA256(seed + sortedIds + 'final-key').toString();
-    return finalKey;
+
+    // Generate a 128-bit (16 byte) key using SHA256 and taking first 16 bytes
+    const fullHash = CryptoJS.SHA256(sortedIds + 'aes-key-2024').toString();
+
+    // Take first 32 hex characters (16 bytes = 128 bits)
+    return fullHash.substring(0, 32);
 };
 
 /**
- * Encrypts a text/URL using AES-256-CBC with quantum-derived key
- * @param {string} text - Plain text to encrypt
- * @param {string} userId1 - First user ID
- * @param {string} userId2 - Second user ID
- * @returns {string} - Encrypted text with IV prepended
+ * Encrypt data using AES-128-CBC
  */
 const encryptData = (text, userId1, userId2) => {
     if (!text || typeof text !== 'string') {
@@ -26,17 +24,22 @@ const encryptData = (text, userId1, userId2) => {
     }
 
     try {
-        const quantumKey = deriveSharedKey(userId1, userId2);
+        // Get 128-bit shared key
+        const key = deriveSharedKey(userId1, userId2);
+
+        // Generate random 128-bit IV
         const iv = CryptoJS.lib.WordArray.random(16);
 
-        const encrypted = CryptoJS.AES.encrypt(text, CryptoJS.enc.Hex.parse(quantumKey), {
+        // Encrypt using AES-128-CBC
+        const encrypted = CryptoJS.AES.encrypt(text, CryptoJS.enc.Hex.parse(key), {
             iv: iv,
             mode: CryptoJS.mode.CBC,
             padding: CryptoJS.pad.Pkcs7
         });
 
-        const combined = iv.toString() + ':QKD:' + encrypted.toString();
-        console.log('🔒 Server: Data encrypted with AES-256 + QKD');
+        // Combine IV and ciphertext
+        const combined = iv.toString() + ':' + encrypted.toString();
+        console.log('🔒 Server: Data encrypted with AES-128');
         return combined;
     } catch (error) {
         console.error('Server encryption error:', error);
@@ -45,11 +48,7 @@ const encryptData = (text, userId1, userId2) => {
 };
 
 /**
- * Decrypts an encrypted text/URL
- * @param {string} encryptedText - Encrypted text with IV prepended
- * @param {string} userId1 - First user ID
- * @param {string} userId2 - Second user ID
- * @returns {string} - Decrypted plain text
+ * Decrypt data using AES-128-CBC
  */
 const decryptData = (encryptedText, userId1, userId2) => {
     if (!encryptedText || typeof encryptedText !== 'string') {
@@ -57,21 +56,28 @@ const decryptData = (encryptedText, userId1, userId2) => {
     }
 
     try {
-        if (!encryptedText.includes(':QKD:')) {
-            return encryptedText; // Not encrypted
+        // Check if this is an encrypted message (contains IV separator)
+        if (!encryptedText.includes(':')) {
+            return encryptedText;
         }
 
-        const parts = encryptedText.split(':QKD:');
+        // Extract IV and ciphertext
+        const parts = encryptedText.split(':');
         if (parts.length !== 2) {
             return encryptedText;
         }
 
         const ivHex = parts[0];
         const ciphertext = parts[1];
-        const quantumKey = deriveSharedKey(userId1, userId2);
+
+        // Get 128-bit shared key
+        const key = deriveSharedKey(userId1, userId2);
+
+        // Parse IV
         const iv = CryptoJS.enc.Hex.parse(ivHex);
 
-        const decrypted = CryptoJS.AES.decrypt(ciphertext, CryptoJS.enc.Hex.parse(quantumKey), {
+        // Decrypt using AES-128-CBC
+        const decrypted = CryptoJS.AES.decrypt(ciphertext, CryptoJS.enc.Hex.parse(key), {
             iv: iv,
             mode: CryptoJS.mode.CBC,
             padding: CryptoJS.pad.Pkcs7
@@ -84,7 +90,7 @@ const decryptData = (encryptedText, userId1, userId2) => {
             return encryptedText;
         }
 
-        console.log('🔓 Server: Data decrypted with AES-256 + QKD');
+        console.log('🔓 Server: Data decrypted with AES-128');
         return decryptedText;
     } catch (error) {
         console.error('Server decryption error:', error);
