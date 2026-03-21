@@ -9,8 +9,8 @@ Thumbs.db
 # Dependencies (root and nested workspaces)
 node_modules/
 **/node_modules/
-ENCRYPTION_README.md
-IMPLEMENTATION_SUMMARY.md
+.ENCRYPTION_README.md
+
 # Logs
 logs/
 *.log
