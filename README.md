@@ -288,7 +288,7 @@ This project is licensed under the MIT License.
 
 ## 👨‍💻 Author
 
-**Arnav Tiwari**
+**Arnav**
 - GitHub: [@ArnavT27](https://github.com/ArnavT27)
 
 ## 🙏 Acknowledgments
