@@ -297,11 +297,7 @@ This project is licensed under the MIT License.
 - Cloudinary for image hosting
 - Mailtrap for email testing
 - The MERN stack community
-
-## 📧 Support
-
-For support, email your-email@example.com or open an issue in the repository.
-
+  
 ---
 
 Made with ❤️ using the MERN Stack
